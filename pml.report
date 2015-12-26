@@ -1,0 +1,93 @@
+---
+title: ""
+author: "Mikhail"
+date: "Saturday, December 26, 2015"
+output: html_document
+---
+
+Setting up working directory
+```{r}
+setwd(choose.dir())
+```
+
+Loading requeired libraries:
+```{r message=FALSE, warning=FALSE}
+library(caret)
+library(rattle)
+library(rpart.plot)
+library(randomForest)
+```
+
+Loading files into R with basic preprocessing:
+
+```{r}
+train<-read.table(file.choose(), sep=",",na.strings=c("NA","#DIV/0!",""), header=TRUE)
+train<-train[-c(1:7)]
+test<-read.table(file.choose(), sep=",",na.strings=c("NA","#DIV/0!",""), header=TRUE)
+```
+
+
+Searching for columns with NA
+```{r}
+sums<-0 # number of NA in the column
+vars<-0 # variable names
+
+for (i in 1:length(train)){
+  sums[i]<-sum(is.na(train[i])) 
+  vars[i]<-names(train)[i]
+  na<-data.frame(sums,vars)
+}
+
+dim(na[na$sums>0,])[1]
+na[na$sums>0,]
+
+```
+We can see that 100 of variables have more than 90% of NA. these variables will be eliminated from the train and test sets.
+
+```{r}
+train<-train[,names(train) %in% na[na$s>0,"vars"]==FALSE]
+names<-names(train)
+
+test<-test[names[1:52]]
+```
+
+Setting up train and test sets for building classification models.
+``` {r}
+InTrain<-createDataPartition(y=train$classe,p=0.6,list=FALSE)
+trainSet<-train[InTrain,]
+testSet<-train[-InTrain,]
+```
+
+Checking up covariates with zero variability
+```{r}
+NZV<-nearZeroVar(trainSet,saveMetrics=TRUE)
+NZV
+```
+No covariates have 0 variablity, therefore all of them will be included in classification models
+
+First model is rPart 
+``` {r}
+model.rpart<-train(classe~.,data=trainSet,method="rpart")
+model.rpart
+```
+
+rPart algorithm produces poor result with only 53.6% accuracy.
+
+Lets try Random Forest algorithm then
+```{r}
+model.RF<-randomForest(classe~.,data=trainSet,importance=TRUE)
+``` {r echo=FALSE}
+varImpPlot(model.RF)
+```
+```{r}
+predict.RF.Model<-predict(model.RF,testSet[-53])
+confusionMatrix(predict.RF.Model,testSet$classe)
+```
+
+Random Forest algorithm produces excellent result with 99% accurac.Therefore it is reasonable to apply this model for prediction part of assignment.
+
+``` {r}
+predict.test<-predict(model.RF,test)
+predict.test
+```
+The results were submitted with 20 correct answers.
